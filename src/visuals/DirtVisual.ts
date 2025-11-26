@@ -1,10 +1,16 @@
+import type { DirtGrid } from "../logic/DirtGrid";
+
 export class DirtVisual {
   scene: Phaser.Scene;
-  ojectToClean: any;
-  dirtGrid: any;
+  ojectToClean: Phaser.GameObjects.Rectangle; // temprary, will be mesh or something later
+  dirtGrid: DirtGrid;
   graphics: Phaser.GameObjects.Graphics;
 
-  constructor(scene: Phaser.Scene, ojectToClean: any, dirtGrid: any) {
+  constructor(
+    scene: Phaser.Scene,
+    ojectToClean: Phaser.GameObjects.Rectangle,
+    dirtGrid: DirtGrid
+  ) {
     this.scene = scene;
     this.ojectToClean = ojectToClean;
     this.dirtGrid = dirtGrid;
