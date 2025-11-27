@@ -24,9 +24,6 @@ export class WaterStreamTool implements Tool {
   // How quickly beamX follows targetX (0..1 per frame).
   private readonly horizontalFollowLerp: number;
 
-  // Maximum speed of tipY movement in grid rows per second,
-  private readonly maxTipSpeedRowsPerSecond: number;
-
   // True when player is holding the water tool (pointer is down).
   private isActive: boolean;
   // Latest X from pointer, in screen coordinates.
@@ -52,7 +49,6 @@ export class WaterStreamTool implements Tool {
     this.baseCleanAmountPerSecond = 5;
     this.dirtThreshold = 0.1;
     this.horizontalFollowLerp = 0.3;
-    this.maxTipSpeedRowsPerSecond = 60;
 
     this.isActive = false;
     this.targetX = 0;
@@ -69,35 +65,6 @@ export class WaterStreamTool implements Tool {
 
     const u = (screenX - bounds.left) / bounds.width;
     return Math.floor(u * this.gridWidth);
-  }
-
-  private findLowestDirtyRow(
-    centerColumn: number,
-    radiusColumns: number
-  ): number | null {
-    let lowestRow: number | null = null;
-
-    for (
-      let cx = centerColumn - radiusColumns;
-      cx <= centerColumn + radiusColumns;
-      cx++
-    ) {
-      if (cx < 0 || cx >= this.gridWidth) continue;
-
-      // Scan this column from bottom (gridHeight - 1) to top (0)
-      for (let y = this.gridHeight - 1; y >= 0; y--) {
-        const value = this.dirtGrid.getValueAt(cx, y);
-        if (value > this.dirtThreshold) {
-          // Found lowest dirty cell in this column
-          if (lowestRow === null || y > lowestRow) {
-            lowestRow = y;
-          }
-          break; // exit inner loop for this column
-        }
-      }
-    }
-
-    return lowestRow;
   }
 
   private findLowestDirtyRowInCenterColumn(
@@ -172,7 +139,7 @@ export class WaterStreamTool implements Tool {
     this.isActive = false;
   }
 
-  public onPointer(x: number, y: number): void {
+  public onPointer(x: number): void {
     this.targetX = x;
   }
 

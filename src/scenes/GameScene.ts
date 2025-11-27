@@ -96,6 +96,7 @@ export class GameScene extends Phaser.Scene {
   update(time: number, delta: number) {
     // update tool if it has update method
     this.currentTool.update?.(delta);
+    time;
 
     const cleanPercentage = this.dirtGrid.getCleanPercent();
     const cleanPercentageForUI = Math.round(cleanPercentage * 10) / 10;
