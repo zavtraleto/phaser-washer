@@ -6,7 +6,7 @@ const config: Phaser.Types.Core.GameConfig = {
   width: 800,
   height: 600,
   parent: "game",
-  backgroundColor: "#202020",
+  backgroundColor: "#002455",
   scene: [GameScene],
 };
 

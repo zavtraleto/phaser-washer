@@ -2,6 +2,8 @@ import { DirtGrid } from "../logic/DirtGrid";
 import type { Tool } from "./Tool";
 
 export class BrushTool implements Tool {
+  public readonly name: string = "Brush";
+
   private box: Phaser.GameObjects.Rectangle;
   private dirtGrid: DirtGrid;
   private onDirtChanged: () => void;

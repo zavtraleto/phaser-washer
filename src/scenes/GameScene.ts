@@ -1,8 +1,9 @@
 import { DirtGrid } from "../logic/DirtGrid";
 import { DirtVisual } from "../visuals/DirtVisual";
 import { StrokeInput } from "../input/StrokeInput";
-import { BrushTool } from "../tools/BrushTool";
 import type { Tool } from "../tools/Tool";
+import { BrushTool } from "../tools/BrushTool";
+import { WaterStreamTool } from "../tools/WaterStreamTool";
 
 export class GameScene extends Phaser.Scene {
   // Game object
@@ -10,14 +11,19 @@ export class GameScene extends Phaser.Scene {
 
   // UI elements
   private hudText!: Phaser.GameObjects.Text;
+  private toolText!: Phaser.GameObjects.Text;
 
   // Dirt system
   private dirtGrid!: DirtGrid;
   private dirtVisual!: DirtVisual;
 
-  // Input system and tools
+  // Input system
   private strokeInput!: StrokeInput;
+
+  // Tools
   private currentTool!: Tool;
+  private brushTool!: BrushTool;
+  private waterStreamTool!: WaterStreamTool;
 
   // flag to indicate dirt visual needs redraw
   private dirtNeedsRedraw: boolean = true;
@@ -32,8 +38,12 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
+    this.box = this.add.rectangle(width / 2, height / 2, 400, 400, 0x88292f);
 
-    this.box = this.add.rectangle(width / 2, height / 2, 300, 150, 0x00ff00);
+    // Dirt changed callback
+    const onDirtChanged = () => {
+      this.dirtNeedsRedraw = true;
+    };
 
     // create a logical dirt grid
     this.dirtGrid = new DirtGrid(256, 256);
@@ -41,9 +51,26 @@ export class GameScene extends Phaser.Scene {
     // create a visual dirt grid
     this.dirtVisual = new DirtVisual(this, this.box, this.dirtGrid);
 
-    // create current tool
-    this.currentTool = new BrushTool(this.box, this.dirtGrid, () => {
-      this.dirtNeedsRedraw = true;
+    // Brush tool instance
+    this.brushTool = new BrushTool(this.box, this.dirtGrid, onDirtChanged);
+    // Water stream tool instance
+    this.waterStreamTool = new WaterStreamTool(
+      this.box,
+      this.dirtGrid,
+      onDirtChanged
+    );
+    // set current tool to a tool by perssing 1-2 keys
+    this.currentTool = this.brushTool;
+
+    // temporary input handling for tool switching
+    this.input.keyboard?.on("keydown-ONE", () => {
+      this.currentTool = this.brushTool;
+      this.setTool(this.currentTool);
+    });
+
+    this.input.keyboard?.on("keydown-TWO", () => {
+      this.currentTool = this.waterStreamTool;
+      this.setTool(this.currentTool);
     });
 
     // create stroke input handler
@@ -53,6 +80,17 @@ export class GameScene extends Phaser.Scene {
       fontSize: "20px",
       color: "#ffffff",
     });
+
+    this.toolText = this.add.text(16, 46, `Tool: ${this.currentTool.name}`, {
+      fontSize: "20px",
+      color: "#ffffff",
+    });
+  }
+
+  public setTool(tool: Tool): void {
+    this.currentTool = tool;
+    this.strokeInput.setTool(tool);
+    this.toolText.setText(`Tool: ${tool.name}`);
   }
 
   update(time: number, delta: number) {

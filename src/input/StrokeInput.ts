@@ -12,10 +12,14 @@ export class StrokeInput {
     this.setupInputEvents();
   }
 
+  public setTool(tool: Tool): void {
+    this.currentTool = tool;
+  }
+
   private setupInputEvents() {
     this.scene.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       this.isInputActive = true;
-      this.lastPoint = null;
+      this.lastPoint = new Phaser.Math.Vector2(pointer.x, pointer.y);
       this.currentTool.onPointerDown?.();
       this.processStroke(pointer.x, pointer.y);
     });

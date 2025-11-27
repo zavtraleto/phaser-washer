@@ -35,7 +35,7 @@ export class DirtVisual {
         // Only draw dirty cells (value > 0)
         if (value > 0) {
           const alpha = value; // value is 0-1, where 1 = fully dirty, 0 = clean
-          this.graphics.fillStyle(0x654321, alpha);
+          this.graphics.fillStyle(0x9fa4a9, alpha);
           this.graphics.fillRect(
             boxBounds.x + x * cellWidth,
             boxBounds.y + y * cellHeight,

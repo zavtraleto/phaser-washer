@@ -1,4 +1,5 @@
 export interface Tool {
+  readonly name: string;
   onPointer(x: number, y: number): void;
   onPointerDown?(): void;
   onPointerUp?(): void;
