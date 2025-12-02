@@ -179,7 +179,7 @@ export class WaterStreamTool implements Tool {
     const deltaSeconds = dt / 1000;
 
     if (!this.isActive) {
-      this.waterVisual.redraw(null, null);
+      this.waterVisual.redraw(null, null, null);
       return;
     }
 
@@ -188,7 +188,7 @@ export class WaterStreamTool implements Tool {
 
     const centerColumn = this.screenXToGridColumn(this.beamX);
     if (centerColumn === null) {
-      this.waterVisual.redraw(this.beamX, null);
+      this.waterVisual.redraw(this.targetX, this.beamX, null);
       return;
     }
 
