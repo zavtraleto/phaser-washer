@@ -1,5 +1,6 @@
 import type { DirtGrid } from "../logic/DirtGrid";
 import type { Tool } from "./Tool";
+import { WaterStreamVisual } from "../visuals/WaterStreamVisual";
 
 export class WaterStreamTool implements Tool {
   public readonly name: string = "Water Stream";
@@ -7,6 +8,7 @@ export class WaterStreamTool implements Tool {
   private box: Phaser.GameObjects.Rectangle;
   private dirtGrid: DirtGrid;
   private onDirtChanged: () => void;
+  private waterVisual: WaterStreamVisual;
 
   // Cached from dirtGrid.width/height for convenience.
   private readonly gridWidth: number;
@@ -32,6 +34,9 @@ export class WaterStreamTool implements Tool {
   private beamX: number;
   private tipRow: number | null;
 
+  private contactRadiusColumns: number;
+  private maxTipSpeedRowsPerSecond: number;
+
   constructor(
     box: Phaser.GameObjects.Rectangle,
     dirtGrid: DirtGrid,
@@ -40,6 +45,7 @@ export class WaterStreamTool implements Tool {
     this.box = box;
     this.dirtGrid = dirtGrid;
     this.onDirtChanged = onDirtChanged;
+    this.waterVisual = new WaterStreamVisual(box, dirtGrid.height);
 
     this.gridWidth = dirtGrid.width;
     this.gridHeight = dirtGrid.height;
@@ -48,7 +54,9 @@ export class WaterStreamTool implements Tool {
     this.beamRadiusColumns = 30;
     this.baseCleanAmountPerSecond = 5;
     this.dirtThreshold = 0.1;
-    this.horizontalFollowLerp = 0.3;
+    this.horizontalFollowLerp = 0.15;
+    this.contactRadiusColumns = 5;
+    this.maxTipSpeedRowsPerSecond = 2000;
 
     this.isActive = false;
     this.targetX = 0;
@@ -68,15 +76,30 @@ export class WaterStreamTool implements Tool {
   }
 
   private findLowestDirtyRowInCenterColumn(
-    centerColumn: number
+    centerColumn: number,
+    contactRadiusColumns: number
   ): number | null {
-    for (let y = this.gridHeight - 1; y >= 0; y--) {
-      const value = this.dirtGrid.getValueAt(centerColumn, y);
-      if (value > this.dirtThreshold) {
-        return y;
+    let lowestRow: number | null = null;
+
+    for (
+      let cx = centerColumn - contactRadiusColumns;
+      cx <= centerColumn + contactRadiusColumns;
+      cx++
+    ) {
+      if (cx < 0 || cx >= this.gridWidth) continue;
+
+      for (let y = this.gridHeight - 1; y >= 0; y--) {
+        const value = this.dirtGrid.getValueAt(cx, y);
+        if (value > this.dirtThreshold) {
+          if (lowestRow === null || y > lowestRow) {
+            lowestRow = y;
+          }
+          break;
+        }
       }
     }
-    return null;
+
+    return lowestRow;
   }
 
   private applyCleaningAtTip(
@@ -131,8 +154,17 @@ export class WaterStreamTool implements Tool {
     return false;
   }
 
-  public onPointerDown(): void {
+  public onPointerDown(x?: number): void {
     this.isActive = true;
+
+    if (typeof x === "number") {
+      this.targetX = x;
+      this.beamX = x;
+    } else {
+      // fallback: если StrokeInput вызывает onPointerDown без координат,
+      // то beamX всё равно сразу ставим в targetX
+      this.beamX = this.targetX;
+    }
   }
 
   public onPointerUp(): void {
@@ -146,18 +178,55 @@ export class WaterStreamTool implements Tool {
   public update(dt: number): void {
     const deltaSeconds = dt / 1000;
 
-    if (!this.isActive) return;
+    if (!this.isActive) {
+      this.waterVisual.redraw(null, null);
+      return;
+    }
 
+    // horizontal inertia
     this.beamX += (this.targetX - this.beamX) * this.horizontalFollowLerp;
 
     const centerColumn = this.screenXToGridColumn(this.beamX);
-    if (centerColumn === null) return;
+    if (centerColumn === null) {
+      this.waterVisual.redraw(this.beamX, null);
+      return;
+    }
 
-    const targetTipRow = this.findLowestDirtyRowInCenterColumn(centerColumn);
-    if (targetTipRow === null) return;
+    // Find the lowest dirty row only in the central strip
+    const targetTipRow = this.findLowestDirtyRowInCenterColumn(
+      centerColumn,
+      this.contactRadiusColumns
+    );
 
-    this.tipRow = targetTipRow;
+    if (targetTipRow === null) {
+      // No dirt in this strip – DO NOT CLEAN ANYTHING,
+      // but continue drawing the stream, conditionally to the "sole" of the object.
+      const fallbackRow = 0; // or 0, or the last tipRow
+      this.tipRow = fallbackRow;
+      this.waterVisual.redraw(this.targetX, this.beamX, fallbackRow);
+      return;
+    }
+
+    // Inertia for tipRow (corrected version)
+    if (this.tipRow === null) {
+      this.tipRow = targetTipRow;
+    } else {
+      const maxSpeedPerFrame = this.maxTipSpeedRowsPerSecond * deltaSeconds;
+      const deltaRow = targetTipRow - this.tipRow;
+
+      if (Math.abs(deltaRow) <= maxSpeedPerFrame) {
+        this.tipRow = targetTipRow;
+      } else {
+        this.tipRow += Math.sign(deltaRow) * maxSpeedPerFrame;
+      }
+    }
+
     const roundedTipRow = Math.round(this.tipRow);
+
+    // Clean only when there is actually dirt
     this.applyCleaningAtTip(centerColumn, roundedTipRow, deltaSeconds);
+
+    // Visual – ALWAYS, while isActive = true
+    this.waterVisual.redraw(this.targetX, this.beamX, roundedTipRow);
   }
 }

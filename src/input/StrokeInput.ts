@@ -20,7 +20,7 @@ export class StrokeInput {
     this.scene.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       this.isInputActive = true;
       this.lastPoint = new Phaser.Math.Vector2(pointer.x, pointer.y);
-      this.currentTool.onPointerDown?.();
+      this.currentTool.onPointerDown?.(pointer.x, pointer.y);
       this.processStroke(pointer.x, pointer.y);
     });
 

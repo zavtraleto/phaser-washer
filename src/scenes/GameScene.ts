@@ -53,7 +53,8 @@ export class GameScene extends Phaser.Scene {
 
     // Brush tool instance
     this.brushTool = new BrushTool(this.box, this.dirtGrid, onDirtChanged);
-    // Water stream tool instance
+
+    // Water stream tool instance (creates its own visual internally)
     this.waterStreamTool = new WaterStreamTool(
       this.box,
       this.dirtGrid,
