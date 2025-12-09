@@ -1,24 +1,23 @@
-import type { DirtGrid } from "../logic/DirtGrid";
+import type { DirtSystem } from "../logic/DirtSystem";
 import type { Tool } from "./Tool";
+import { ToolId, type ToolDirtProfile } from "./ToolTypes";
 import { WaterStreamVisual } from "../visuals/WaterStreamVisual";
 
 export class WaterStreamTool implements Tool {
   public readonly name: string = "Water Stream";
 
   private box: Phaser.GameObjects.Rectangle;
-  private dirtGrid: DirtGrid;
+  private dirtSystem: DirtSystem;
   private onDirtChanged: () => void;
   private waterVisual: WaterStreamVisual;
+  private profile: ToolDirtProfile;
 
-  // Cached from dirtGrid.width/height for convenience.
+  // Cached from dirtSystem.width/height for convenience.
   private readonly gridWidth: number;
   private readonly gridHeight: number;
 
   // Half-width of the water beam in grid columns;
   private readonly beamRadiusColumns: number;
-
-  // How much dirt value is removed per second at the center of the beam (in grid units 0..1).
-  private readonly baseCleanAmountPerSecond: number;
 
   // Values below this are considered "clean" when searching for lowest dirty row.
   private readonly dirtThreshold: number;
@@ -39,20 +38,25 @@ export class WaterStreamTool implements Tool {
 
   constructor(
     box: Phaser.GameObjects.Rectangle,
-    dirtGrid: DirtGrid,
+    dirtSystem: DirtSystem,
     onDirtChanged: () => void
   ) {
     this.box = box;
-    this.dirtGrid = dirtGrid;
+    this.dirtSystem = dirtSystem;
     this.onDirtChanged = onDirtChanged;
-    this.waterVisual = new WaterStreamVisual(box, dirtGrid.height);
+    this.waterVisual = new WaterStreamVisual(box, dirtSystem.height);
 
-    this.gridWidth = dirtGrid.width;
-    this.gridHeight = dirtGrid.height;
+    this.gridWidth = dirtSystem.width;
+    this.gridHeight = dirtSystem.height;
+
+    // Water stream profile: effective on both, faster on grease
+    this.profile = {
+      moldRate: 0.8,
+      greaseRate: 1.5,
+    };
 
     // Tuning values (tweaks for feel), maybe custom tool setup later
     this.beamRadiusColumns = 30;
-    this.baseCleanAmountPerSecond = 5;
     this.dirtThreshold = 0.1;
     this.horizontalFollowLerp = 0.15;
     this.contactRadiusColumns = 5;
@@ -75,11 +79,16 @@ export class WaterStreamTool implements Tool {
     return Math.floor(u * this.gridWidth);
   }
 
+  /**
+   * Find the lowest dirty row by checking all layers.
+   * Returns the row where any layer has dirt above threshold.
+   */
   private findLowestDirtyRowInCenterColumn(
     centerColumn: number,
     contactRadiusColumns: number
   ): number | null {
     let lowestRow: number | null = null;
+    const layers = this.dirtSystem.getAllLayers();
 
     for (
       let cx = centerColumn - contactRadiusColumns;
@@ -89,8 +98,17 @@ export class WaterStreamTool implements Tool {
       if (cx < 0 || cx >= this.gridWidth) continue;
 
       for (let y = this.gridHeight - 1; y >= 0; y--) {
-        const value = this.dirtGrid.getValueAt(cx, y);
-        if (value > this.dirtThreshold) {
+        // Check if any layer has dirt at this cell
+        let hasDirt = false;
+        for (const layer of layers) {
+          const value = layer.grid.getValue(cx, y);
+          if (value > this.dirtThreshold) {
+            hasDirt = true;
+            break;
+          }
+        }
+
+        if (hasDirt) {
           if (lowestRow === null || y > lowestRow) {
             lowestRow = y;
           }
@@ -102,56 +120,27 @@ export class WaterStreamTool implements Tool {
     return lowestRow;
   }
 
+  /**
+   * Apply cleaning at the water stream tip using DirtSystem.
+   * Uses the beam radius and delegates to DirtSystem.applyAreaClean.
+   */
   private applyCleaningAtTip(
     centerColumn: number,
     tipRow: number,
     deltaSeconds: number
-  ) {
-    const beamRadius = this.beamRadiusColumns;
+  ): void {
+    const changed = this.dirtSystem.applyAreaClean(
+      ToolId.WaterStream,
+      this.profile,
+      centerColumn,
+      tipRow,
+      this.beamRadiusColumns,
+      deltaSeconds
+    );
 
-    // Iterate over grid cells in a square around the tip
-    for (let y = tipRow - beamRadius; y <= tipRow + beamRadius; y++) {
-      if (y < 0 || y >= this.gridHeight) continue;
-
-      for (
-        let x = centerColumn - beamRadius;
-        x <= centerColumn + beamRadius;
-        x++
-      ) {
-        if (x < 0 || x >= this.gridWidth) continue;
-        const dx = x - centerColumn;
-        const dy = y - tipRow;
-        const distSq = dx * dx + dy * dy;
-
-        // Skip cells outside the beam radius
-        if (distSq > beamRadius * beamRadius) continue;
-
-        const distanceFromCenter = Math.sqrt(distSq);
-        // Strength falls off linearly from center (1.0) to edge (0.0)
-        const strengthFactor = 1 - distanceFromCenter / beamRadius;
-
-        const cleanAmount =
-          this.baseCleanAmountPerSecond * strengthFactor * deltaSeconds;
-
-        // apply celaning to the cell?
-        this.applyCleanToCell(x, y, cleanAmount);
-      }
-    }
-  }
-
-  private applyCleanToCell(gx: number, gy: number, amount: number): boolean {
-    if (gx < 0 || gx >= this.gridWidth || gy < 0 || gy >= this.gridHeight) {
-      return false;
-    }
-    const index = gy * this.gridWidth + gx;
-    const before = this.dirtGrid.gridData[index];
-    const after = Math.max(0, before - amount);
-    this.dirtGrid.gridData[index] = after;
-    if (after !== before) {
+    if (changed) {
       this.onDirtChanged();
-      return true;
     }
-    return false;
   }
 
   public onPointerDown(x?: number): void {

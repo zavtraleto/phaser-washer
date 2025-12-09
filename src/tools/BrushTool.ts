@@ -1,24 +1,35 @@
-import { DirtGrid } from "../logic/DirtGrid";
+import type { DirtSystem } from "../logic/DirtSystem";
 import type { Tool } from "./Tool";
+import { ToolId, type ToolDirtProfile } from "./ToolTypes";
 
 export class BrushTool implements Tool {
   public readonly name: string = "Brush";
 
   private box: Phaser.GameObjects.Rectangle;
-  private dirtGrid: DirtGrid;
+  private dirtSystem: DirtSystem;
   private onDirtChanged: () => void;
+  private profile: ToolDirtProfile;
 
   public readonly toolRadius: number = 10;
   public readonly cleanRadius: number = 20;
 
+  // Fixed dt for instant stamp feel (simulates ~60fps frame)
+  private readonly stampDt: number = 0.016;
+
   constructor(
     box: Phaser.GameObjects.Rectangle,
-    dirtGrid: DirtGrid,
+    dirtSystem: DirtSystem,
     onDirtChanged: () => void
   ) {
     this.box = box;
-    this.dirtGrid = dirtGrid;
+    this.dirtSystem = dirtSystem;
     this.onDirtChanged = onDirtChanged;
+
+    // Brush profile: good at mold, weak at grease
+    this.profile = {
+      moldRate: 1.0,
+      greaseRate: 0.4,
+    };
   }
 
   // Convert pointer position to local box coordinates (u, v) ranging from 0 to 1
@@ -55,9 +66,20 @@ export class BrushTool implements Tool {
 
     const { u, v } = localCoordinates;
 
-    const gridX = Math.floor(u * this.dirtGrid.width);
-    const gridY = Math.floor(v * this.dirtGrid.height);
-    this.dirtGrid.cleanArea(gridX, gridY, this.cleanRadius);
-    this.onDirtChanged();
+    const gridX = Math.floor(u * this.dirtSystem.width);
+    const gridY = Math.floor(v * this.dirtSystem.height);
+
+    const changed = this.dirtSystem.applyAreaClean(
+      ToolId.Brush,
+      this.profile,
+      gridX,
+      gridY,
+      this.cleanRadius,
+      this.stampDt
+    );
+
+    if (changed) {
+      this.onDirtChanged();
+    }
   }
 }

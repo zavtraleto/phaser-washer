@@ -1,47 +1,59 @@
-import type { DirtGrid } from "../logic/DirtGrid";
+import type { DirtSystem } from "../logic/DirtSystem";
 
+/**
+ * Renders all dirt layers from DirtSystem as overlays on the object to clean.
+ * Layers are rendered in order (first = bottom, last = top).
+ */
 export class DirtVisual {
-  scene: Phaser.Scene;
-  ojectToClean: Phaser.GameObjects.Rectangle; // temprary, will be mesh or something later
-  dirtGrid: DirtGrid;
-  graphics: Phaser.GameObjects.Graphics;
+  private scene: Phaser.Scene;
+  private objectToClean: Phaser.GameObjects.Rectangle; // temporary, will be mesh or something later
+  private dirtSystem: DirtSystem;
+  private graphics: Phaser.GameObjects.Graphics;
 
   constructor(
     scene: Phaser.Scene,
-    ojectToClean: Phaser.GameObjects.Rectangle,
-    dirtGrid: DirtGrid
+    objectToClean: Phaser.GameObjects.Rectangle,
+    dirtSystem: DirtSystem
   ) {
     this.scene = scene;
-    this.ojectToClean = ojectToClean;
-    this.dirtGrid = dirtGrid;
+    this.objectToClean = objectToClean;
+    this.dirtSystem = dirtSystem;
 
     this.graphics = this.scene.add.graphics();
-    this.graphics.setDepth(10); //on top of the current objectToClean
+    this.graphics.setDepth(10); // on top of the current objectToClean
   }
 
-  public redrawFromDirtGrid() {
+  /**
+   * Redraw all dirt layers from DirtSystem.
+   * Layers are drawn in order: first layer is bottom, last layer is on top.
+   */
+  public redraw(): void {
     this.graphics.clear();
 
-    const boxBounds = this.ojectToClean.getBounds();
+    const boxBounds = this.objectToClean.getBounds();
+    const cellWidth = boxBounds.width / this.dirtSystem.width;
+    const cellHeight = boxBounds.height / this.dirtSystem.height;
 
-    const cellWidth = boxBounds.width / this.dirtGrid.width;
-    const cellHeight = boxBounds.height / this.dirtGrid.height;
+    const layers = this.dirtSystem.getAllLayers();
 
-    // Draw dirt overlay - cells with value > 0 are dirty
-    for (let y = 0; y < this.dirtGrid.height; y++) {
-      for (let x = 0; x < this.dirtGrid.width; x++) {
-        const value = this.dirtGrid.getValueAt(x, y);
+    // Draw each layer in order (first = bottom, last = top)
+    for (const layer of layers) {
+      const { color, maxOpacity } = layer.config;
 
-        // Only draw dirty cells (value > 0)
-        if (value > 0) {
-          const alpha = value; // value is 0-1, where 1 = fully dirty, 0 = clean
-          this.graphics.fillStyle(0x9fa4a9, alpha);
-          this.graphics.fillRect(
-            boxBounds.x + x * cellWidth,
-            boxBounds.y + y * cellHeight,
-            cellWidth,
-            cellHeight
-          );
+      for (let y = 0; y < this.dirtSystem.height; y++) {
+        for (let x = 0; x < this.dirtSystem.width; x++) {
+          const value = layer.grid.getValue(x, y);
+
+          if (value > 0) {
+            const alpha = value * maxOpacity;
+            this.graphics.fillStyle(color, alpha);
+            this.graphics.fillRect(
+              boxBounds.x + x * cellWidth,
+              boxBounds.y + y * cellHeight,
+              cellWidth,
+              cellHeight
+            );
+          }
         }
       }
     }
