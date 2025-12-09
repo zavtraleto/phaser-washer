@@ -14,6 +14,7 @@ export class GameScene extends Phaser.Scene {
   // UI elements
   private hudText!: Phaser.GameObjects.Text;
   private toolText!: Phaser.GameObjects.Text;
+  private fpsText!: Phaser.GameObjects.Text;
 
   // Dirt system
   private dirtSystem!: DirtSystem;
@@ -40,7 +41,7 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-    this.box = this.add.rectangle(width / 2, height / 2, 400, 400, 0x88292f);
+    this.box = this.add.rectangle(width / 2, height / 2, 300, 400, 0x88292f);
 
     // Dirt changed callback
     const onDirtChanged = () => {
@@ -73,7 +74,7 @@ export class GameScene extends Phaser.Scene {
     };
 
     // Create DirtSystem with layers (mold = bottom, grease = top)
-    this.dirtSystem = new DirtSystem(256, 256, [moldConfig, greaseConfig]);
+    this.dirtSystem = new DirtSystem(128, 128, [moldConfig, greaseConfig]);
 
     // Initialize layers
     this.dirtSystem.getLayer(DirtLayerId.Mold)?.initializeAsFull();
@@ -117,6 +118,38 @@ export class GameScene extends Phaser.Scene {
       fontSize: "20px",
       color: "#ffffff",
     });
+
+    // FPS counter (top right corner)
+    this.fpsText = this.add
+      .text(width - 16, 16, "FPS: 0", {
+        fontSize: "16px",
+        color: "#00ff00",
+      })
+      .setOrigin(1, 0);
+
+    // Tool buttons at bottom
+    const btnY = height - 40;
+    const btnStyle = {
+      fontSize: "18px",
+      color: "#ffffff",
+      backgroundColor: "#333333",
+      padding: { x: 12, y: 6 },
+    };
+
+    const btn1 = this.add
+      .text(width / 2 - 30, btnY, "1", btnStyle)
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.setTool(this.brushTool));
+
+    const btn2 = this.add
+      .text(width / 2 + 30, btnY, "2", btnStyle)
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.setTool(this.waterStreamTool));
+
+    btn1;
+    btn2; // suppress unused warnings
   }
 
   public setTool(tool: Tool): void {
@@ -129,6 +162,10 @@ export class GameScene extends Phaser.Scene {
     // update tool if it has update method
     this.currentTool.update?.(delta);
     time;
+
+    // Update FPS counter
+    const fps = Math.round(1000 / delta);
+    this.fpsText.setText(`FPS: ${fps}`);
 
     const cleanPercentage = this.dirtSystem.getCombinedCleanPercent();
     const cleanPercentageForUI = Math.round(cleanPercentage * 10) / 10;
